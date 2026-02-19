@@ -37,6 +37,12 @@ class PrayerTime {
     /// Location these prayer times are calculated for
     var location: Location
     
+    /// Calculation method used for these prayer times
+    var calculationMethod: Int?
+    
+    /// Set of prayer names that have been manually completed by the user
+    var completedPrayers: Set<String> = []
+    
     // MARK: - Initialization
     
     init(
@@ -47,7 +53,8 @@ class PrayerTime {
         maghrib: Date,
         isha: Date,
         hijriDate: String,
-        location: Location
+        location: Location,
+        calculationMethod: Int? = nil
     ) {
         self.date = date
         self.fajr = fajr
@@ -57,6 +64,7 @@ class PrayerTime {
         self.isha = isha
         self.hijriDate = hijriDate
         self.location = location
+        self.calculationMethod = calculationMethod
     }
     
     // MARK: - Computed Properties
@@ -103,7 +111,22 @@ class PrayerTime {
         return allPrayers.filter { $0.time > now }.count
     }
     
-    /// Checks if a specific prayer has passed
+    /// Returns the number of prayers manually completed
+    var completedCount: Int {
+        return completedPrayers.count
+    }
+    
+    /// Returns the total number of prayers for the day
+    var totalCount: Int {
+        return allPrayers.count
+    }
+    
+    /// Returns true if all prayers for the day have been manually completed
+    var isFullyCompleted: Bool {
+        return completedCount == totalCount
+    }
+    
+    /// Checks if a specific prayer has passed (calculated)
     func hasPrayerPassed(_ prayerName: String) -> Bool {
         let now = Date()
         
@@ -114,6 +137,31 @@ class PrayerTime {
         case "Maghrib": return now >= maghrib
         case "Isha": return now >= isha
         default: return false
+        }
+    }
+    
+    /// Checks if a specific prayer has been manually completed
+    func isPrayerCompleted(_ prayerName: String) -> Bool {
+        return completedPrayers.contains(prayerName)
+    }
+    
+    /// Toggles the completion status of a prayer
+    func togglePrayerCompletion(_ prayerName: String) {
+        if completedPrayers.contains(prayerName) {
+            completedPrayers.remove(prayerName)
+        } else {
+            completedPrayers.insert(prayerName)
+        }
+    }
+    /// Returns the time for a specific prayer name
+    func time(for prayerName: String) -> Date? {
+        switch prayerName {
+        case "Fajr": return fajr
+        case "Dhuhr": return dhuhr
+        case "Asr": return asr
+        case "Maghrib": return maghrib
+        case "Isha": return isha
+        default: return nil
         }
     }
 }

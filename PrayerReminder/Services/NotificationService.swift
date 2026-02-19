@@ -10,18 +10,46 @@ import UserNotifications
 
 /// Service for managing prayer time notifications
 @MainActor
-class NotificationService: ObservableObject {
+class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     // MARK: - Properties
     
     @Published var isAuthorized = false
+    @Published var shouldNavigateToHome = false
     private let notificationCenter = UNUserNotificationCenter.current()
     
     // MARK: - Initialization
     
-    init() {
+    override init() {
+        super.init()
+        notificationCenter.delegate = self
+        // Clear any existing badge
+        notificationCenter.setBadgeCount(0)
         Task {
             await checkAuthorizationStatus()
         }
+    }
+    
+    // MARK: - UNUserNotificationCenterDelegate
+    
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        // Play sound and show banner even if app is in foreground
+        completionHandler([.banner, .sound])
+    }
+    
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        // Handle notification tap
+        Task { @MainActor in
+            shouldNavigateToHome = true
+        }
+        completionHandler()
     }
     
     // MARK: - Permission Management
@@ -30,7 +58,7 @@ class NotificationService: ObservableObject {
     func requestPermission() async -> Bool {
         do {
             let granted = try await notificationCenter.requestAuthorization(
-                options: [.alert, .sound, .badge]
+                options: [.alert, .sound]
             )
             isAuthorized = granted
             
@@ -95,8 +123,6 @@ class NotificationService: ObservableObject {
             }
         }
         
-        // Update app badge to show remaining prayers
-        await updateBadge(prayerTimes: prayerTimes)
         
         print("📅 Scheduled \(scheduledCount) prayer notifications")
     }
@@ -154,16 +180,7 @@ class NotificationService: ObservableObject {
         }
     }
     
-    /// Update app badge to show number of remaining prayers
-    private func updateBadge(prayerTimes: PrayerTime) async {
-        let remainingPrayers = prayerTimes.remainingPrayersCount
-        
-        do {
-            try await notificationCenter.setBadgeCount(remainingPrayers)
-        } catch {
-            print("Error updating badge: \(error)")
-        }
-    }
+    
     
     // MARK: - Notification Management
     
@@ -182,5 +199,32 @@ class NotificationService: ObservableObject {
     func cancelNotification(for prayerName: String) {
         notificationCenter.removePendingNotificationRequests(withIdentifiers: [prayerName])
         print("🗑️ Cancelled \(prayerName) notification")
+    }
+    
+    // MARK: - Test Notification
+    
+    /// Schedule a test notification 5 seconds from now
+    func scheduleTestNotification() {
+        let content = UNMutableNotificationContent()
+        content.title = "Test Notification"
+        content.body = "This is how your prayer reminders will appear."
+        content.sound = .default
+        
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
+        
+        let request = UNNotificationRequest(
+            identifier: "TEST_NOTIFICATION",
+            content: content,
+            trigger: trigger
+        )
+        
+        Task {
+            do {
+                try await notificationCenter.add(request)
+                print("✅ Scheduled test notification for 5 seconds from now")
+            } catch {
+                print("Error scheduling test notification: \(error)")
+            }
+        }
     }
 }

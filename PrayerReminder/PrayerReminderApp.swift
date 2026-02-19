@@ -19,7 +19,6 @@ struct PrayerReminderApp: App {
     @AppStorage(Constants.Defaults.hasCompletedOnboarding) private var hasCompletedOnboarding = false
     @StateObject private var notificationService = NotificationService()
     @StateObject private var locationService = LocationService()
-    @StateObject private var cloudSyncService = CloudSyncService()
     
     // MARK: - Initialization
     
@@ -34,7 +33,7 @@ struct PrayerReminderApp: App {
             let modelConfiguration = ModelConfiguration(
                 schema: schema,
                 isStoredInMemoryOnly: false,
-                cloudKitDatabase: .none // We use CloudKit separately for settings
+                cloudKitDatabase: .none
             )
             
             modelContainer = try ModelContainer(
@@ -52,23 +51,49 @@ struct PrayerReminderApp: App {
     
     var body: some Scene {
         WindowGroup {
-            Group {
-                if hasCompletedOnboarding {
-                    // Main app
-                    MainContentView()
-                        .environmentObject(notificationService)
-                        .environmentObject(locationService)
-                        .environmentObject(cloudSyncService)
-                } else {
-                    // Onboarding flow
-                    OnboardingContainerView(isComplete: $hasCompletedOnboarding)
-                        .environmentObject(notificationService)
-                        .environmentObject(locationService)
-                        .environmentObject(cloudSyncService)
-                }
-            }
+            AppRootView(
+                hasCompletedOnboarding: $hasCompletedOnboarding,
+                notificationService: notificationService,
+                locationService: locationService
+            )
             .modelContainer(modelContainer)
         }
+    }
+}
+
+// MARK: - App Root View
+
+struct AppRootView: View {
+    @Binding var hasCompletedOnboarding: Bool
+    @ObservedObject var notificationService: NotificationService
+    @ObservedObject var locationService: LocationService
+    
+    @Query private var settingsQuery: [UserSettings]
+    
+    var theme: ColorScheme? {
+        guard let settings = settingsQuery.first else { return nil }
+        switch settings.theme {
+        case .light: return .light
+        case .dark: return .dark
+        case .system: return nil
+        }
+    }
+    
+    var body: some View {
+        Group {
+            if hasCompletedOnboarding {
+                // Main app
+                MainContentView()
+                    .environmentObject(notificationService)
+                    .environmentObject(locationService)
+            } else {
+                // Onboarding flow
+                OnboardingContainerView(isComplete: $hasCompletedOnboarding)
+                    .environmentObject(notificationService)
+                    .environmentObject(locationService)
+            }
+        }
+        .preferredColorScheme(theme)
     }
 }
 
@@ -77,7 +102,6 @@ struct PrayerReminderApp: App {
 struct MainContentView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var notificationService: NotificationService
-    @EnvironmentObject private var cloudSyncService: CloudSyncService
     
     @State private var viewModel: PrayerViewModel?
     
@@ -92,29 +116,46 @@ struct MainContentView: View {
         .onAppear {
             if viewModel == nil {
                 let vm = PrayerViewModel(modelContext: modelContext)
-                vm.setServices(notification: notificationService, cloudSync: cloudSyncService)
+                vm.setServices(notification: notificationService)
                 viewModel = vm
             }
         }
     }
 }
 
-/// Inner view that properly observes PrayerViewModel's @Published properties
+/// Inner view using TabView for main navigation
 private struct MainTabContent: View {
     @ObservedObject var viewModel: PrayerViewModel
+    @EnvironmentObject private var notificationService: NotificationService
+    @State private var selectedTab = 0
     
     var body: some View {
-        TabView {
-            MainPrayerView(viewModel: viewModel)
-                .tabItem {
-                    Label("Prayer", systemImage: "moon.stars.fill")
-                }
+        TabView(selection: $selectedTab) {
+            // Home Tab
+            NavigationStack {
+                MainPrayerView(viewModel: viewModel)
+            }
+            .tabItem {
+                Label("Home", systemImage: "moon.stars.fill")
+            }
+            .tag(0)
             
-            SettingsView()
-                .tabItem {
-                    Label("Settings", systemImage: "gearshape.fill")
-                }
+            // Settings Tab
+            NavigationStack {
+                SettingsView()
+            }
+            .tabItem {
+                Label("Settings", systemImage: "gearshape.fill")
+            }
+            .tag(1)
         }
+        .environmentObject(viewModel)
         .accentColor(.adaptivePrimary)
+        .onChange(of: notificationService.shouldNavigateToHome) { _, shouldNavigate in
+            if shouldNavigate {
+                selectedTab = 0
+                notificationService.shouldNavigateToHome = false
+            }
+        }
     }
 }

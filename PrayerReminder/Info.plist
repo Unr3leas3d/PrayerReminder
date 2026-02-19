@@ -6,6 +6,8 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>Nur</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -23,9 +25,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>We need your location to automatically update prayer times when you travel to a different area.</string>
+	<string>Nur uses your location to automatically update prayer times and notifications as you travel, ensuring you stay connected no matter where you are.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We need your location to calculate accurate prayer times for your area.</string>
+	<string>Nur requires your location to calculate accurate prayer times specifically for your current city and area.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
