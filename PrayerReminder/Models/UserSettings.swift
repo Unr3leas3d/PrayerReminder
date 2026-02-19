@@ -40,6 +40,9 @@ class UserSettings {
     /// App theme preference
     var themeRawValue: Int
     
+    /// User's preferred time format (12h, 24h, or system)
+    var timeFormatRawValue: Int = 0
+    
     // MARK: - Location Settings
     
     /// Whether to automatically update location when device moves significantly
@@ -55,16 +58,26 @@ class UserSettings {
     init(
         userName: String = "",
         location: Location = .cupertino,
-        calculationMethod: CalculationMethod = .muslimWorldLeague,
+        calculationMethod: CalculationMethod? = nil,
         enabledPrayers: [String: Bool]? = nil,
         notificationTimings: [String: Int]? = nil,
         showGregorianDate: Bool = true,
         theme: AppTheme = .system,
+        timeFormat: TimeFormat = .system,
         autoUpdateLocation: Bool = false
     ) {
         self.userName = userName
         self.location = location
-        self.calculationMethodRawValue = calculationMethod.rawValue
+        
+        // Determine calculation method:
+        // 1. Use provided method if any
+        // 2. Or recommend based on country code
+        // 3. Fallback to default (.muslimWorldLeague)
+        let method = calculationMethod ?? 
+                     (location.countryCode.map { CalculationMethod.recommended(forCountryCode: $0) }) ?? 
+                     .muslimWorldLeague
+        
+        self.calculationMethodRawValue = method.rawValue
         
         // Default: all prayers enabled
         self.enabledPrayers = enabledPrayers ?? [
@@ -86,6 +99,7 @@ class UserSettings {
         
         self.showGregorianDate = showGregorianDate
         self.themeRawValue = theme.rawValue
+        self.timeFormatRawValue = timeFormat.rawValue
         self.autoUpdateLocation = autoUpdateLocation
         self.lastSyncDate = nil
     }
@@ -109,6 +123,16 @@ class UserSettings {
         }
         set {
             themeRawValue = newValue.rawValue
+        }
+    }
+    
+    /// Time format (safe unwrap from raw value)
+    var timeFormat: TimeFormat {
+        get {
+            TimeFormat(rawValue: timeFormatRawValue) ?? .system
+        }
+        set {
+            timeFormatRawValue = newValue.rawValue
         }
     }
     
@@ -163,6 +187,25 @@ enum AppTheme: Int, Codable, CaseIterable, Identifiable {
         case .light: return "sun.max.fill"
         case .dark: return "moon.fill"
         case .system: return "circle.lefthalf.filled"
+        }
+    }
+}
+
+// MARK: - TimeFormat Enum
+
+/// Time format options
+enum TimeFormat: Int, Codable, CaseIterable, Identifiable {
+    case system = 0
+    case format12h = 1
+    case format24h = 2
+    
+    var id: Int { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .system: return "System"
+        case .format12h: return "12-Hour (AM/PM)"
+        case .format24h: return "24-Hour"
         }
     }
 }
